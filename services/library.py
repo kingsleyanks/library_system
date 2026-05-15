@@ -1,22 +1,72 @@
 from models.book import Book
+from database.db_connection import DatabaseConnection
 from models.member import Member
 from services.algorithms import *
+from database.db_manager import DatabaseManager
 
 class Library:
     def __init__(self, name):
-        self.name = name
-        self.books = {}
-        self.members = {}
+        self.name        = name
+        self.books       = {}         # still cache in memory for speed
+        self.members     = {}
+        self.db          = DatabaseManager()
+        self.db.initialise_database()
+        self._load_from_database() 
         
     # ══════════════════════════════════════════════
     # BOOK MANAGEMENT
     # ══════════════════════════════════════════════
+    def _load_from_database(self):
+        """Load all books and members from DB into memory on startup."""
+        for row in self.db.get_all_books():
+            book              = Book(row["title"], row["author"],
+                                     row["isbn"],  row["genre"])
+            book.is_available = bool(row["is_available"])
+            book.due_date     = row["due_date"]
+            self.books[book.isbn] = book
+
+        print(f"✓ Loaded {len(self.books)} books from database")
+        
+        # ── Load members ───────────────────────────────────────────
+        for row in self.db.get_all_members():
+            # Recreate the right member type based on what's stored
+            member_type = row["member_type"]
+
+            if "Student" in member_type:
+                from models.student_member import StudentMember
+                member = StudentMember(
+                    row["name"], row["member_id"], row["email"], "N/A", "N/A"
+                )
+            elif "Staff" in member_type:
+                from models.staff_member import StaffMember
+                member = StaffMember(
+                    row["name"], row["member_id"], row["email"], "N/A", "N/A"
+                )
+            elif "Premium" in member_type:
+                from models.premium_member import PremiumMember
+                member = PremiumMember(
+                    row["name"], row["member_id"], row["email"], "Gold"
+                )
+            elif "Librarian" in member_type:
+                from models.librarian_member import LibrarianMember
+                member = LibrarianMember(
+                    row["name"], row["member_id"], row["email"], "N/A", "N/A", 1
+                )
+            else:
+                from models.member import Member
+                member = Member(row["name"], row["member_id"], row["email"])
+
+            member.paid_fines = row["paid_fines"]
+            self.members[member.member_id] = member
+
+        print(f"✓ Loaded {len(self.members)} members from database")
     
     def add_book(self, book):
         
         if book.isbn in self.books:
             return f"Book with ISBN {book.isbn} already exists in the library."
         self.books[book.isbn] = book 
+        self.db.add_book(book)          # ← persist to database
         return f"'{book.title}' added to the library. Total books: {len(self.books)}"
     
     def remove_book(self, isbn):
@@ -60,6 +110,7 @@ class Library:
         if member.member_id in self.members:
             return f"Member ID {member.member_id} already registered."
         self.members[member.member_id] = member
+        self.db.register_member(member)     # ← persist to database
         return f"{member.get_member_type()} '{member.name}' registered successfully."
 
     def remove_member(self, member_id):
@@ -93,7 +144,14 @@ class Library:
         if not book:
             return f"Book ISBN '{isbn}' not found in catalog."
 
-        return member.borrow_book(book)
+        result = member.borrow_book(book)
+        
+        # If borrow was successful, update the book's availability in the library
+        if not book.is_available:
+            self.db.update_book_availability(book.isbn, False)  # ← persist change to database
+            self.db.record_loan(member_id, isbn, member.LOAN_PERIOD_DAYS)  # ← record the loan in the database
+            
+        return result
 
     def return_book(self, member_id, isbn):
         """Process a book return."""
@@ -105,7 +163,12 @@ class Library:
         if not book:
             return f"Book ISBN '{isbn}' not found in catalog."
 
-        return member.return_book(book)
+        result = member.return_book(book)
+        if book.is_available:  # If return was successful, update the book's availability in the library
+            self.db.update_book_availability(book.isbn, True)  # ← persist change to database
+            self.db.record_return(member_id, isbn)  # ← record the return in the database
+            
+        return result
 
     def pay_fine(self, member_id, amount):
         """Process a fine payment for a member."""
@@ -119,20 +182,20 @@ class Library:
     
     def get_catalog_sorted(self, sort_by="title", algorithm = "merge"):
         """Return the catalog sorted by a specified key and algorithm."""
-        key_func = {
+        key_map = {
             "title" : lambda b: b.title,
             "author": lambda b: b.author,
             "genre" : lambda b: b.genre
         }
-        if sort_by not in key_func:
+        if sort_by not in key_map:
             return list(self.books.values())  # Return unsorted if invalid key
-        key = key_func[sort_by]
+        key        = key_map[sort_by]       # ✅ extract the lambda
         books_list = list(self.books.values())
 
 
         if algorithm == "quick":
-            return quick_sort(books_list, key=key_func)
-        return merge_sort(books_list, key=key_func)
+            return quick_sort(books_list, key=key)
+        return merge_sort(books_list, key=key)
     
     # ══════════════════════════════════════════════
     # BINARY SEARCH
