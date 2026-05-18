@@ -1,0 +1,12 @@
+/* static/css/main.css */
+body {
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.stat-card {
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+}

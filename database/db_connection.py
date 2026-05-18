@@ -24,3 +24,4 @@ class DatabaseConnection:
         else:
             self.connection.commit() # Commit if everything was successful
         self.connection.close()
+        return False  # ← let exceptions propagate

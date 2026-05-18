@@ -85,7 +85,7 @@ class DatabaseManager:
             cursor.execute("SELECT * FROM books")
             return cursor.fetchall()
         
-    def get_availalable_books(self):
+    def get_available_books(self):
         """Returns only available books"""
         with DatabaseConnection() as conn:
             cursor = conn.cursor()
@@ -100,7 +100,6 @@ class DatabaseManager:
                 SELECT books.title,
                           books.author,
                           books.genre,
-                          books.year,
                           members.name AS member_name,
                           members.email AS member_email,
                           loans.due_date,
