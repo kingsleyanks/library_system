@@ -8,6 +8,7 @@ from database.db_manager import DatabaseManager
 import datetime
 
 from library.models import Book, Member, Loan
+from library.constants import MEMBER_LIMITS
 
 # ══════════════════════════════════════════════
 # DASHBOARD
@@ -150,14 +151,9 @@ def member_add(request):
             messages.error(request, f'Member ID {member_id} already exists.')
             return render(request, 'library/member_form.html')
 
-        # Set limits based on member type
-        limits = {
-            'Student'  : {'max_books': 3,   'loan_days': 14},
-            'Staff'    : {'max_books': 10,  'loan_days': 30},
-            'Premium'  : {'max_books': 8,   'loan_days': 21},
-            'Librarian': {'max_books': 999, 'loan_days': 30},
-        }
-        config = limits.get(member_type, {'max_books': 5, 'loan_days': 14})
+        # Use MEMBER_LIMITS constant
+        config = MEMBER_LIMITS.get(member_type, {'max_books': 5, 'loan_days': 14})
+
 
         Member.objects.create(
             member_id   = member_id,

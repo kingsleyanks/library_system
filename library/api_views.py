@@ -7,13 +7,14 @@ from database.db_manager      import DatabaseManager
 from django.utils             import timezone
 from django.db.models         import Q, Sum, F, ExpressionWrapper, FloatField
 import datetime
+from library.constants import MEMBER_LIMITS
 
 from library.models       import Book, Member, Loan
 from library.serializers  import (
     BookSerializer, MemberSerializer, LoanSerializer,
     LoanCreateSerializer, ReturnSerializer
 )
-
+from rest_framework import viewsets
 
 # ══════════════════════════════════════════════
 # BOOKS
@@ -144,14 +145,14 @@ class MemberListCreateView(APIView):
         serializer = MemberSerializer(data=request.data)
         if serializer.is_valid():
             # Set limits based on member type
-            limits = {
-                'Student'  : {'max_books': 3,   'loan_days': 14},
-                'Staff'    : {'max_books': 10,  'loan_days': 30},
-                'Premium'  : {'max_books': 8,   'loan_days': 21},
-                'Librarian': {'max_books': 999, 'loan_days': 30},
-            }
+            # limits = {
+            #     'Student'  : {'max_books': 3,   'loan_days': 14},
+            #     'Staff'    : {'max_books': 10,  'loan_days': 30},
+            #     'Premium'  : {'max_books': 8,   'loan_days': 21},
+            #     'Librarian': {'max_books': 999, 'loan_days': 30},
+            # }
             member_type = serializer.validated_data.get('member_type', 'Student')
-            config      = limits.get(member_type, {'max_books': 5, 'loan_days': 14})
+            config      = MEMBER_LIMITS.get(member_type, {'max_books': 5, 'loan_days': 14})
             serializer.save(**config)
             return Response(
                 serializer.data,
@@ -254,6 +255,14 @@ class ReturnBookView(APIView):
         )
 
 
+class LoanViewSet(viewsets.ModelViewSet):
+    queryset = Loan.objects.select_related('book', 'member')  # Ensure select_related is used
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return LoanListSerializer  # Lightweight serializer for list views
+        return LoanSerializer  # Optimized detailed serializer
+
 class OverdueLoansView(APIView):
     """GET /api/loans/overdue/ → list all overdue loans."""
 
@@ -264,8 +273,8 @@ class OverdueLoansView(APIView):
         ).select_related('member', 'book').order_by('due_date')
 
         return Response({
-            'count'  : overdue_loans.count(),
-            'results': LoanSerializer(overdue_loans, many=True).data
+            'count': overdue_loans.count(),
+            'results': LoanListSerializer(overdue_loans, many=True).data  # Use lightweight serializer
         })
 
 

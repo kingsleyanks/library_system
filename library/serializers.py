@@ -50,6 +50,25 @@ class MemberSerializer(serializers.ModelSerializer):
     def get_borrowed_books_count(self, obj):
         return obj.borrowed_books_count()
 
+class LoanListSerializer(serializers.ModelSerializer):
+    """
+    Lightweight serializer for loan list endpoints.
+    Avoids expensive nested serializers and computed fields.
+    """
+
+    book_title  = serializers.CharField(source='book.title', read_only=True)
+    member_name = serializers.CharField(source='member.name', read_only=True)
+
+    class Meta:
+        model = Loan
+        fields = [
+            'id',
+            'book_title',
+            'member_name',
+            'borrowed_on',
+            'due_date',
+            'returned_on',
+        ]
 
 class LoanSerializer(serializers.ModelSerializer):
     """Detailed loan with nested book and member info."""
@@ -68,7 +87,14 @@ class LoanSerializer(serializers.ModelSerializer):
     def get_is_overdue(self, obj):
         return obj.is_overdue()
 
+class LoanViewSet(viewsets.ModelViewSet):
+    queryset = Loan.objects.select_related('book', 'member')
 
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return LoanListSerializer
+        return LoanSerializer
+    
 class LoanCreateSerializer(serializers.Serializer):
     """
     Used specifically for creating loans — takes IDs not nested objects.
@@ -126,15 +152,40 @@ class LoanCreateSerializer(serializers.Serializer):
 
 
 class ReturnSerializer(serializers.Serializer):
-    """Used for returning a book — just needs the loan ID."""
-    loan_id = serializers.IntegerField()
+    """
+    Used for returning a book.
 
-    def validate_loan_id(self, value):
-        """validate_<fieldname>() runs for that specific field."""
+    Optional member_id adds ownership validation so users
+    cannot return loans belonging to someone else.
+    """
+    loan_id   = serializers.IntegerField()
+    member_id = serializers.CharField(required=False)
+
+    def validate(self, data):
+        loan_id = data.get('loan_id')
+        member_id = data.get('member_id')
+
+        # Validate active loan exists
         try:
-            loan = Loan.objects.get(id=value, returned_on__isnull=True)
-        except Loan.DoesNotExist:
-            raise serializers.ValidationError(
-                f"Active loan with ID {value} not found."
+            loan = Loan.objects.select_related('member').get(
+                id=loan_id,
+                returned_on__isnull=True
             )
-        return value
+        except Loan.DoesNotExist:
+            raise serializers.ValidationError({
+                'loan_id': f"Active loan with ID {loan_id} not found."
+            })
+
+        # If member_id provided, verify ownership
+        if member_id is not None:
+            if loan.member.member_id != member_id:
+                raise serializers.ValidationError({
+                    'member_id': (
+                        f"Loan {loan_id} does not belong to member "
+                        f"'{member_id}'."
+                    )
+                })
+
+        # Attach resolved objects for reuse in the view
+        data['loan'] = loan
+        return data

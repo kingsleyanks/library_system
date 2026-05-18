@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from library.constants import MEMBER_LIMITS
 
 # Create your models here.
 class Book(models.Model):
@@ -57,6 +58,10 @@ class Member(models.Model):
     
     def borrowed_books_count(self):
         return self.loan_set.filter(returned_on__isnull=True).count()
+    
+    def get_limits(self):
+        """Get the borrowing limits for this member."""
+        return MEMBER_LIMITS.get(self.member_type, {'max_books': 5, 'loan_days': 14})
 
     def __str__(self):
         return f"{self.name} ({self.member_type})"

@@ -79,12 +79,6 @@ class Member:
         else:
             self.paid_fines += amount
             return f"Partial payment of ${amount:.2f} made. Still outstanding: ${outstanding - amount:.2f}"
-        
-    def get_number_of_borrowed_books(self):
-        return len(self.borrowed_books)
-    
-    def check_if_can_borrow(self):
-        return len(self.borrowed_books) < self.MAX_BOOKS
 
     # ── Display ─────────────────────────────────────────────────
 
