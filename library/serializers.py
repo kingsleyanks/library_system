@@ -87,14 +87,7 @@ class LoanSerializer(serializers.ModelSerializer):
     def get_is_overdue(self, obj):
         return obj.is_overdue()
 
-class LoanViewSet(viewsets.ModelViewSet):
-    queryset = Loan.objects.select_related('book', 'member')
 
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return LoanListSerializer
-        return LoanSerializer
-    
 class LoanCreateSerializer(serializers.Serializer):
     """
     Used specifically for creating loans — takes IDs not nested objects.

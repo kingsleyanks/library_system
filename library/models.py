@@ -1,6 +1,6 @@
 from django.db import models
 from django.utils import timezone
-from library.constants import MEMBER_LIMITS
+from library.constants import MEMBER_LIMITS, FINE_PER_DAY
 
 # Create your models here.
 class Book(models.Model):
@@ -53,7 +53,7 @@ class Member(models.Model):
         for loan in self.loan_set.filter(returned_on__isnull=True):
             if loan.due_date < timezone.now().date():
                 days = (timezone.now().date() - loan.due_date).days
-                total += days * 0.50
+                total += days * FINE_PER_DAY
         return round(total, 2)
     
     def borrowed_books_count(self):

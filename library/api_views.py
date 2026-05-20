@@ -48,7 +48,7 @@ class BookListCreateView(APIView):
 
         serializer = BookSerializer(books, many=True)
         return Response({
-            'count'  : books.count(),
+            'count'  : len(serializer.data),
             'results': serializer.data
         })
 
@@ -169,7 +169,7 @@ class MemberDetailView(APIView):
 
     def get(self, request, member_id):
         try:
-            member = Member.objects.get(member_id=member_id)
+            member = Member.objects.prefetch_related('loan_set__book').get(member_id=member_id)
         except Member.DoesNotExist:
             return Response(
                 {'error': f"Member '{member_id}' not found."},

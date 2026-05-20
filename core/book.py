@@ -1,4 +1,4 @@
-# models/book.py
+# core/book.py
 from datetime import datetime, timedelta
 
 class Book:

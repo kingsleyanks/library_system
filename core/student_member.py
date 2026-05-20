@@ -1,4 +1,4 @@
-from models.member import Member
+from core.member import Member
 
 class StudentMember(Member):
     MAX_BOOKS = 3

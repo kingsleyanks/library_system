@@ -1,6 +1,6 @@
 # models/staff_member.py
 
-from models.member import Member
+from core.member import Member
 
 class StaffMember(Member):
     MAX_BOOKS = 10

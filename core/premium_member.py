@@ -1,6 +1,6 @@
-# models/premium_member.py
+# core/premium_member.py
 
-from models.member import Member
+from core.member import Member
 import datetime
 
 class PremiumMember(Member):

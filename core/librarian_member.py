@@ -1,5 +1,5 @@
 # models/librarian_member.py
-from models.member import Member
+from core.member import Member
 
 class LibrarianMember(Member):
     LOAN_PERIOD_DAYS = 30
