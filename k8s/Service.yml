@@ -6,8 +6,8 @@ spec:
   selector:
     app: library-app
   ports:
-    - port: 80
-      targetPort: 8000
+  - port: 80
+    targetPort: 8000
   # LoadBalancer on cloud; for minikube/kind use NodePort instead:
-  # type: NodePort
-  type: LoadBalancer
+  type: NodePort
+  # type: LoadBalancer

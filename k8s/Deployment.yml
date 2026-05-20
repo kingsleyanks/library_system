@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: library-app
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: library-app
@@ -13,89 +13,96 @@ spec:
         app: library-app
     spec:
       initContainers:
-        - name: wait-for-db
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - until nc -z library-db 5432; do echo waiting for postgres; sleep 2; done
-        - name: migrate
-          image: kingsleyanks/library_system:latest
-          command: ["python", "manage.py", "migrate", "--noinput"]
-          env:
-            - name: DJANGO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: library-secrets
-                  key: django-secret-key
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: library-secrets
-                  key: database-url
-            - name: DEBUG
-              value: "False"
-        - name: collectstatic
-          image: kingsleyanks/library_system:latest
-          command: ["python", "manage.py", "collectstatic", "--noinput"]
-          env:
-            - name: DJANGO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: library-secrets
-                  key: django-secret-key
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: library-secrets
-                  key: database-url
-            - name: DEBUG
-              value: "False"
-          volumeMounts:
-            - name: staticfiles
-              mountPath: /app/staticfiles
-      containers:
-        - name: library-app
-          image: kingsleyanks/library_system:latest
-          ports:
-            - containerPort: 8000
-          env:
-            - name: DJANGO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: library-secrets
-                  key: django-secret-key
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: library-secrets
-                  key: database-url
-            - name: DEBUG
-              value: "False"
-            - name: ALLOWED_HOSTS
-              value: "library-service,library-app,localhost,127.0.0.1"
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-          readinessProbe:
-            httpGet:
-              path: /api/books/
-              port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /api/books/
-              port: 8000
-            initialDelaySeconds: 30
-            periodSeconds: 20
-          volumeMounts:
-            - name: staticfiles
-              mountPath: /app/staticfiles
-      volumes:
+      - name: wait-for-db
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - until nc -z library-db 5432; do echo waiting for postgres; sleep 2; done
+      - name: migrate
+        image: kingsleyanks/library_system:latest
+        command: [ "sh", "-c", "export DATABASE_URL=postgres://library_user:${DB_PASSWORD}@library-db:5432/library_db && python manage.py migrate --noinput" ]
+        env:
+        - name: DJANGO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: library-secrets
+              key: django-secret-key
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: library-secrets
+              key: db-password
+        - name: DEBUG
+          value: "False"
+      - name: collectstatic
+        image: kingsleyanks/library_system:latest
+        command: [ "sh", "-c", "export DATABASE_URL=postgres://library_user:${DB_PASSWORD}@library-db:5432/library_db && python manage.py collectstatic --noinput" ]
+        env:
+        - name: DJANGO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: library-secrets
+              key: django-secret-key
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: library-secrets
+              key: db-password
+        - name: DEBUG
+          value: "False"
+        volumeMounts:
         - name: staticfiles
-          emptyDir: {}
+          mountPath: /app/staticfiles
+      containers:
+      - name: library-app
+        image: kingsleyanks/library_system:latest
+        command: [ "sh", "-c", "export DATABASE_URL=postgres://library_user:${DB_PASSWORD}@library-db:5432/library_db && exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3" ]
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DJANGO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: library-secrets
+              key: django-secret-key
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: library-secrets
+              key: db-password
+        - name: DEBUG
+          value: "False"
+        - name: ALLOWED_HOSTS
+          value: "library-service,library-app,localhost,127.0.0.1"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /api/books/
+            port: 8000
+            httpHeaders:
+            - name: Host
+              value: library-service
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/books/
+            port: 8000
+            httpHeaders:
+            - name: Host
+              value: library-service
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        volumeMounts:
+        - name: staticfiles
+          mountPath: /app/staticfiles
+      volumes:
+      - name: staticfiles
+        emptyDir: {}

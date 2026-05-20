@@ -15,8 +15,7 @@ docker push kingsleyanks/library_system:latest
 
 ```bash
 cp Secret.example.yml Secret.yml
-# Edit Secret.yml: set django-secret-key, db-password, and database-url
-# (password in database-url must match db-password)
+# Edit Secret.yml: set django-secret-key and db-password
 kubectl apply -f Secret.yml
 ```
 
@@ -25,8 +24,7 @@ kubectl apply -f Secret.yml
 ```bash
 kubectl create secret generic library-secrets \
   --from-literal=django-secret-key='YOUR_DJANGO_KEY' \
-  --from-literal=db-password='YOUR_DB_PASSWORD' \
-  --from-literal=database-url='postgres://library_user:YOUR_DB_PASSWORD@library-db:5432/library_db'
+  --from-literal=db-password='YOUR_DB_PASSWORD'
 ```
 
 Only `Secret.example.yml` belongs in git. Never commit `Secret.yml`.
@@ -42,6 +40,25 @@ kubectl apply -f Service.yml
 ```
 
 Skip `kubectl apply -f Secret.yml` if you used Option B and the secret already exists.
+
+## 3.1 If you changed db-password after Postgres was already running
+
+Postgres initializes its user password only on first bootstrap of the data volume. If your `library-db-pvc` already contains data from an older password, app startup can fail with `password authentication failed for user "library_user"`.
+
+For a fresh/dev cluster, recreate the DB volume and pod:
+
+```bash
+kubectl delete deployment library-db
+kubectl delete pvc library-db-pvc
+kubectl apply -f PostgresPVC.yml
+kubectl apply -f PostgresDeployment.yml
+```
+
+Then restart the app deployment:
+
+```bash
+kubectl rollout restart deployment library-app
+```
 
 ## 4. Access the app
 
