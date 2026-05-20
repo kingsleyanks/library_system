@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: library-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: library-app
+  template:
+    metadata:
+      labels:
+        app: library-app
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z library-db 5432; do echo waiting for postgres; sleep 2; done
+        - name: migrate
+          image: kingsleyanks/library_system:latest
+          command: ["python", "manage.py", "migrate", "--noinput"]
+          env:
+            - name: DJANGO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: library-secrets
+                  key: django-secret-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: library-secrets
+                  key: database-url
+            - name: DEBUG
+              value: "False"
+        - name: collectstatic
+          image: kingsleyanks/library_system:latest
+          command: ["python", "manage.py", "collectstatic", "--noinput"]
+          env:
+            - name: DJANGO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: library-secrets
+                  key: django-secret-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: library-secrets
+                  key: database-url
+            - name: DEBUG
+              value: "False"
+          volumeMounts:
+            - name: staticfiles
+              mountPath: /app/staticfiles
+      containers:
+        - name: library-app
+          image: kingsleyanks/library_system:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DJANGO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: library-secrets
+                  key: django-secret-key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: library-secrets
+                  key: database-url
+            - name: DEBUG
+              value: "False"
+            - name: ALLOWED_HOSTS
+              value: "library-service,library-app,localhost,127.0.0.1"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /api/books/
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/books/
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - name: staticfiles
+              mountPath: /app/staticfiles
+      volumes:
+        - name: staticfiles
+          emptyDir: {}

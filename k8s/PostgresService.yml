@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: library-db
+spec:
+  selector:
+    app: library-db
+  ports:
+    - port: 5432
+      targetPort: 5432
