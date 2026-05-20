@@ -585,7 +585,8 @@ section("PART 9 — API TESTS")
 print(f"\n{YELLOW}  Note: Start server with 'python manage.py runserver'{RESET}")
 print(f"{YELLOW}  then run this script again for API tests.{RESET}\n")
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+print(f"{YELLOW}  API base URL: {BASE_URL}{RESET}\n")
 
 def api_get(path):
     try:
@@ -772,12 +773,12 @@ print(f"  Loans   : {Loan.objects.count()} total / "
 print(f"  Overdue : {Loan.objects.filter(returned_on__isnull=True, due_date__lt=timezone.now().date()).count()}")
 
 print(f"\n{BOLD}  Browser Test URLs{RESET}")
-print(f"  http://127.0.0.1:8000/              ← Dashboard")
-print(f"  http://127.0.0.1:8000/books/        ← All 100 books")
-print(f"  http://127.0.0.1:8000/members/      ← All 20 members")
-print(f"  http://127.0.0.1:8000/members/M001/ ← Alice (overdue + fines)")
-print(f"  http://127.0.0.1:8000/members/M001/report/ ← Alice report")
-print(f"  http://127.0.0.1:8000/api/books/    ← Books API")
-print(f"  http://127.0.0.1:8000/api/reports/summary/ ← Summary API")
+print(f"  {BASE_URL}/              ← Dashboard")
+print(f"  {BASE_URL}/books/        ← All 100 books")
+print(f"  {BASE_URL}/members/      ← All 20 members")
+print(f"  {BASE_URL}/members/M001/ ← Alice (overdue + fines)")
+print(f"  {BASE_URL}/members/M001/report/ ← Alice report")
+print(f"  {BASE_URL}/api/books/    ← Books API")
+print(f"  {BASE_URL}/api/reports/summary/ ← Summary API")
 
 print()
