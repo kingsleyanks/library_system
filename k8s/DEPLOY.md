@@ -39,6 +39,23 @@ kubectl apply -f Deployment.yml
 kubectl apply -f Service.yml
 ```
 
+### Consolidated apply (single command)
+
+If you prefer a one-liner, apply the whole directory:
+
+```bash
+kubectl apply -f k8s/
+```
+
+Then verify readiness explicitly:
+
+```bash
+kubectl rollout status deployment/library-db
+kubectl rollout status deployment/library-app
+kubectl get pods
+kubectl get svc
+```
+
 Skip `kubectl apply -f Secret.yml` if you used Option B and the secret already exists.
 
 ## 3.1 If you changed db-password after Postgres was already running
@@ -68,6 +85,26 @@ kubectl get svc library-service
 
 - **LoadBalancer** (cloud): use `EXTERNAL-IP`.
 - **Minikube**: set `type: NodePort` in `Service.yml`, then run `minikube service library-service`.
+
+## 5. Run tests inside the app pod
+
+Find the app pod:
+
+```bash
+kubectl get pods -l app=library-app
+```
+
+Run Django tests inside the pod (inject `DATABASE_URL` for the exec shell):
+
+```bash
+kubectl exec -it <app-pod> -c library-app -- sh -c 'export DATABASE_URL="postgres://library_user:${DB_PASSWORD}@library-db:5432/library_db" && python manage.py test'
+```
+
+Run `seed_and_test.py` in the same way:
+
+```bash
+kubectl exec -it <app-pod> -c library-app -- sh -c 'export DATABASE_URL="postgres://library_user:${DB_PASSWORD}@library-db:5432/library_db" && python /app/scripts/seed_and_test.py'
+```
 
 ## Files
 

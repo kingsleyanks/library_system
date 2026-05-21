@@ -1,5 +1,9 @@
-from django.urls import path
+from django.urls import path, include
 from library import api_views, views
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'api/loans', api_views.LoanViewSet, basename='loan')
 
 urlpatterns = [
      # ── Dashboard ──────────────────────────────────────────────
@@ -30,4 +34,7 @@ urlpatterns = [
     path('api/loans/overdue/',                  api_views.OverdueLoansView.as_view(),    name='api_overdue'),
     path('api/reports/summary/',                api_views.LibrarySummaryView.as_view(),  name='api_summary'),
     path('api/members/<str:member_id>/report/', api_views.MemberReportView.as_view(),    name='api_member_report'),
+    
+    # ── Router (LoanViewSet) ────────────────────────────────────
+    path('', include(router.urls)),
 ]

@@ -11,7 +11,7 @@ from library.constants import MEMBER_LIMITS
 
 from library.models       import Book, Member, Loan
 from library.serializers  import (
-    BookSerializer, MemberSerializer, LoanSerializer,
+    BookSerializer, MemberSerializer, LoanSerializer,LoanListSerializer, 
     LoanCreateSerializer, ReturnSerializer
 )
 from rest_framework import viewsets
@@ -319,17 +319,28 @@ class MemberReportView(APIView):
     """GET /api/members/{member_id}/report/ → detailed member report."""
 
     def get(self, request, member_id):
-        db_manager = DatabaseManager()
         try:
-            report = db_manager.get_member_report(member_id)
-            if not report:
-                return Response(
-                    {'error': f"Member '{member_id}' not found."},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            return Response(dict(report), status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response(
-                {'error': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            member = Member.objects.prefetch_related('loan_set__book').get(
+                member_id=member_id
             )
+        except Member.DoesNotExist:
+            return Response(
+                {'error': f"Member '{member_id}' not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        active_loans = Loan.objects.filter(
+            member=member, returned_on__isnull=True
+        ).select_related('book')
+
+        loan_history = Loan.objects.filter(
+            member=member, returned_on__isnull=False
+        ).select_related('book').order_by('-returned_on')
+
+        return Response({
+            'member'              : MemberSerializer(member).data,
+            'active_loans'        : LoanListSerializer(active_loans, many=True).data,
+            'loan_history'        : LoanListSerializer(loan_history, many=True).data,
+            'total_fines_owed'    : member.get_total_fines(),
+            'books_borrowed_count': loan_history.count(),
+        })
